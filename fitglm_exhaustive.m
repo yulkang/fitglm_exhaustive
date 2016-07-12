@@ -9,6 +9,17 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 % 'crossval_args', {}
 % 'UseParallel', 'model' % 'model'|'none'
 %
+% EXAMPLE:
+% n = 1e4;
+% X = rand(n,3) - 0.5;
+% y = X(:,1) * 0.2 + X(:,3) * 0.5 + 0.1;
+% y = max(min(y, 10), -10);
+% p = exp(y) ./ (1 + exp(y));
+% ch = rand(size(p)) < p;
+% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
+%     'model_criterion', 'BIC');
+% disp(mdl);
+%
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
     if ~exist('glm_args', 'var')
@@ -18,10 +29,10 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         ... % 'model_criterion'
         ... % : 'crossval' : cross validates using negative log likelihood
         ... % : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
-        'model_criterion', 'crossval' 
+        'model_criterion', 'BIC' 
         'must_include', [] % Numerical indices of columns to include.
         'crossval_args', {}
-        'UseParallel', 'model' % 'model'|'none'
+        'UseParallel', 'none' % 'model'|'none'
         'group', []
         });
 
