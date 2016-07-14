@@ -6,6 +6,8 @@ function [train, test] = crossvaltf(meth, n_sim, group, varargin)
 % test(TR, SIM) : true if TR is included in the test set
 %                 on the SIM-th simulation.
 
+% 2016 (c) Yul Kang. hk2699 at columbia dot edu.
+
 if isnumeric(group) && isscalar(group)
     n_tr = group;
 else

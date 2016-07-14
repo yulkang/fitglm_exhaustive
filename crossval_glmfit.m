@@ -1,8 +1,10 @@
 function [loglik, loglik0] = crossval_glmfit(X, y, glm_args, varargin)
 % [loglik, loglik0, cvix] = crossval_glmfit(X, y, glm_args, varargin)
 
+% 2016 (c) Yul Kang. hk2699 at columbia dot edu.
+
 S = varargin2S(varargin, {
-    'n_sim', 1e3
+    'n_sim', 1e2
     'crossval_method', 'HoldOut'
     'crossval_args', {0.1}
     'group', []
@@ -13,17 +15,20 @@ assert(iscolumn(y));
 assert(n == length(y));
 
 if isempty(S.group)
-    [~, ~, S.group] = unique(X, 'rows');
+    S.group = ones(n,1);
+%     [~, ~, S.group] = uique(X); 
 end
 
 if verLessThan('matlab', '8.6')
     % Use MATLAB's crossval
-    loglik0 = crossval(@yk.stat.glm_train_test, X, y, ...
-        'holdout', W.crossval_args{1}, 'stratify', S.group, 'mcreps', S.n_sim); % , ...
+    loglik0 = crossval(@glm_train_test, X, y, ...
+        lower(S.crossval_method), S.crossval_args{1}, ...
+        'stratify', S.group, ...
+        'mcreps', S.n_sim); % , ...
 %         'options', statset('UseParallel', 'always'));
 
 else
-    [incl_train0, incl_test0] = yk.stat.crossvaltf( ...
+    [incl_train0, incl_test0] = crossvaltf( ...
         S.crossval_method, S.n_sim, S.group, S.crossval_args{:});
     loglik0 = zeros(S.n_sim, 1);
 
@@ -42,7 +47,7 @@ else
         y1 = predict(mdl1, X(incl_test, :));
         y0 = y(incl_test);
 
-        loglik0(i_sim) = yk.stat.glmlik(X(incl_test, :), y0, y1, ...
+        loglik0(i_sim) = glmlik(X(incl_test, :), y0, y1, ...
             glm_opt.Distribution);
     end
 end

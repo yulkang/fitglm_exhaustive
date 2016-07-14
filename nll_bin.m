@@ -10,7 +10,7 @@ function [nll, nll_sep] = nll_bin(pred_pmf, obs_pmf, varargin)
 % OPTIONS:
 % 'normalize': If true (default), adds a very small number (eps) preserving the sum.
 
-% Yul Kang 2016. hk2699 at columbia dot edu.
+% 2016 (c) Yul Kang. hk2699 at columbia dot edu.
 
 S = varargin2S(varargin, {
     'normalize', true

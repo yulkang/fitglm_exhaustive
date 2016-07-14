@@ -3,16 +3,42 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %
 % [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %
+% mdl: the best GeneralizedLinearModel among the models.
+% mdls: all models that are compared.
+% info: struct about the results of the comparison
+% .param_incl : logical index of parameters chosen
+% .ic_min : minimum information criterion
+% .ic_min_ix : index of the model, starting from the null model.
+% .ic_all(k) : k-th model's IC.
+% .param_incl_all(k,m) : true if m-th parameter is included in k-th model.
+% .ic_all0{k}(s) : for model_criterion=crossval, 
+%                  IC from s-th simulation of k-th model.
+% .ic_all_se(k) : standard error of mean of k-th model's ICs.
+%
+% info also contains the options:
+% .model_criterion
+% .must_include
+% .UseParallel
+% .group
+%
 % OPTIONS:
-% 'model_criterion', 'BIC'
+% 'model_criterion', 'BIC' 
+% ... 'model_criterion'
+% ... : 'crossval' : cross validates using negative log likelihood
+% ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
+% ...
 % 'must_include', [] % Numerical indices of columns to include.
 % 'crossval_args', {}
-% 'UseParallel', 'model' % 'model'|'none'
+% 'UseParallel', 'none' % 'model'|'none'
+% 'group', [] 
+% ... group(k) 
+% ... : an integer between 1 and #group that k-th sample belongs to.
+% ... : as from [~, ~, group] = unique(matrix).
 %
 % EXAMPLE:
 % n = 1e4;
 % X = rand(n,3) - 0.5;
-% y = X(:,1) * 0.2 + X(:,3) * 0.5 + 0.1;
+% y = X(:,1) * 0.4 + X(:,3) * 0.6 + 0.1;
 % y = max(min(y, 10), -10);
 % p = exp(y) ./ (1 + exp(y));
 % ch = rand(size(p)) < p;
@@ -20,20 +46,26 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %     'model_criterion', 'BIC');
 % disp(mdl);
 %
+% See also: demo_fitglm_exhaustive, fitglm
+
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
     if ~exist('glm_args', 'var')
         glm_args = {};
     end
     S = varargin2S(varargin, {
-        ... % 'model_criterion'
-        ... % : 'crossval' : cross validates using negative log likelihood
-        ... % : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         'model_criterion', 'BIC' 
+        ... 'model_criterion'
+        ... : 'crossval' : cross validates using negative log likelihood
+        ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
+        ...
         'must_include', [] % Numerical indices of columns to include.
-        'crossval_args', {}
+        'crossval_args', {} % See 
         'UseParallel', 'none' % 'model'|'none'
         'group', []
+        ... group(k) 
+        ... : an integer between 1 and #group that k-th sample belongs to.
+        ... : as from [~, ~, group] = unique(matrix).
         });
 
     % Construct param_incl_all
@@ -81,7 +113,8 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
     model_criterion = S.model_criterion;
     crossval_args = S.crossval_args;
     if isempty(S.group)
-        [~, ~, group] = unique(X, 'rows');
+        group = ones(size(X, 1), 1);
+%         [~, ~, group] = unique(X, 'rows');
     else
         group = S.group;
     end
@@ -123,7 +156,7 @@ function [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
         case 'crossval'
             if verLessThan('matlab', '8.6')
                 glm_args1 = [glm_args(:)', {'PredictorVars', find(param_incl)}];
-                [c_ic, c_ic0] = yk.stat.crossval_glmfit(X, y, glm_args1, ...
+                [c_ic, c_ic0] = crossval_glmfit(X, y, glm_args1, ...
                     'group', group, crossval_args{:});
 
                 % Take negative log likelihood
@@ -131,7 +164,7 @@ function [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
                 c_ic0 = -c_ic0;
             else
                 glm_args1 = [glm_args(:)', {'PredictorVars',find(param_incl)}];
-                [c_ic, c_ic0] = yk.stat.crossval_glmfit(X, y, glm_args1, ...
+                [c_ic, c_ic0] = crossval_glmfit(X, y, glm_args1, ...
                     'group', group, crossval_args{:});
 
                 % Take negative log likelihood

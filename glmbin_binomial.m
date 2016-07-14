@@ -6,6 +6,8 @@ function [y, X, ic, ia] = glmbin_binomial(X0, y0)
 % ic(tr) : X(ic(tr),:) == X0(tr, :)
 % ia(cond) : X(cond, :) == X0(ia(cond), :)
 
+% 2016 (c) Yul Kang. hk2699 at columbia dot edu.
+
 assert(iscolumn(y0));
 assert(all((y0 == 0) | (y0 == 1) | isnan(y0)));
 assert(size(X0, 1) == length(y0));
