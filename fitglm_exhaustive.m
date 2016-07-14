@@ -1,60 +1,100 @@
 function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
-% Picks the best model among all 2^n_param possible models.
+% FITGLM_EXHAUSTIVE  Picks the best model among all 2^n_param possible models.
 %
-% USAGE:
-% [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, ...)
+% USAGE
+% -----
+% [mdl, info, mdls] = FITGLM_EXHAUSTIVE(X, y, glm_args, ...)
 %
-% INPUT:
+% INPUT
+% -----
 % X: a matrix of independent variables
 % y: a vector of the dependent variable
 % glm_args: a cell array of the rest of the inputs for the fitglm.
 %           For example, {'Distribution', 'binomial'}.
 %
-% OUTPUT:
+% OUTPUT
+% ------
 % mdl: the best GeneralizedLinearModel among the models.
 % mdls: all models that are compared.
 % info: struct about the results of the comparison
-% .param_incl : logical index of parameters chosen
-% .ic_min : minimum information criterion
-% .ic_min_ix : index of the model, starting from the null model.
-% .ic_all(k) : k-th model's IC.
-% .param_incl_all(k,m) : true if m-th parameter is included in k-th model.
-% .ic_all0{k}(s) : for model_criterion=crossval, 
-%                  IC from s-th simulation of k-th model.
-% .ic_all_se(k) : standard error of mean of k-th model's ICs.
+%     .param_incl : logical index of parameters chosen
+%     .ic_min : minimum information criterion
+%     .ic_min_ix : index of the model, starting from the null model.
+%     .ic_all(k) : k-th model's IC.
+%     .param_incl_all(k,m) : true if m-th parameter is included in k-th model.
+%     .ic_all0{k}(s) : for model_criterion=crossval, 
+%                      IC from s-th simulation of k-th model.
+%     .ic_all_se(k) : standard error of mean of k-th model's ICs.
 %
 % info also contains the options:
-% .model_criterion
-% .must_include
-% .UseParallel
-% .group
+%     .model_criterion
+%     .must_include
+%     .UseParallel
+%     .group
 %
+% Name-value pair arguments
+% -------------------------
 % [...] = fitglm_exhaustive(..., 'OPTION1', OPTION1, ...)
 %
-% OPTIONS:
-% 'model_criterion', 'BIC' 
-% ... 'model_criterion'
-% ... : 'crossval' : cross validates using negative log likelihood
-% ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
-% ...
-% 'must_include', [] % Numerical indices of columns to include.
-% 'crossval_args', {} % See crossval_glmfit
-% 'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
-% 'group', [] 
-% ... group(k) 
-% ... : an integer between 1 and #group that k-th sample belongs to.
-% ... : as from [~, ~, group] = unique(matrix).
+% 'model_criterion'
+%     'crossval' : cross validates using negative log likelihood
+%     'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
+%     Default: 'BIC'
 %
-% EXAMPLE:
+% 'must_include'
+%     Numerical indices of columns to include.
+%     Default: []
+%
+% 'crossval_args'
+%     See crossval_glmfit
+%
+% 'UseParallel'
+%     'auto'|'model'|'none'
+%     Default: 'auto'
+%
+% 'group'
+%     vector|empty
+%     vector: When model_criterion is 'crossval', enables stratified sampling.
+%             group(k) is the group number the k-th sample belongs to.
+%             It must be an integer between 1 and the number of groups.
+%     empty : All samples are in one group.
+%
+% EXAMPLE - BIC
+% -------------
 % n = 1e4;
 % X = rand(n,3) - 0.5;
 % y = X(:,1) * 0.4 + X(:,3) * 0.6 + 0.1;
 % y = max(min(y, 10), -10);
 % p = exp(y) ./ (1 + exp(y));
 % ch = rand(size(p)) < p;
+%
 % [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'BIC');
-% disp(mdl);
+%     'model_criterion', 'BIC')
+%
+% EXAMPLE - BIC, always including the second column
+% -------------------------------------------------
+% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
+%     'model_criterion', 'BIC', 'must_include', 2)
+%
+% EXAMPLE - cross-validation with default settings
+% ------------------------------------------------
+% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
+%     'model_criterion', 'crossval')
+%
+% EXAMPLE - cross-validation with 200 simulations of 50% holdout
+% --------------------------------------------------------------
+% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
+%     'model_criterion', 'crossval', ...
+%     'crossval_method', 'HoldOut', ...
+%     'crossval_args', {0.5}, ...
+%     'n_sim', 200)
+%
+% EXAMPLE - 5-fold cross-validation
+% --------------------------------------------------------------
+% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
+%     'model_criterion', 'crossval', ...
+%     'crossval_method', 'Kfold', ...
+%     'crossval_args', {5})
 %
 % See also: demo_fitglm_exhaustive, fitglm, crossval_glmfit
 
@@ -70,7 +110,6 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         ...
         'must_include', [] % Numerical indices of columns to include.
-        'crossval_args', {} % See crossval_glmfit
         'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
         'group', []
         ... group(k) 
@@ -133,7 +172,6 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
 
     mdls = cell(n_model, 1);
     model_criterion = S.model_criterion;
-    crossval_args = S.crossval_args;
     if isempty(S.group)
         group = ones(size(X, 1), 1);
 %         [~, ~, group] = unique(X, 'rows');
@@ -147,7 +185,7 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 param_incl = param_incl_all(i_model, :);
 
                 [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
-                    model_criterion, crossval_args, group);
+                    model_criterion, varargin, group);
 
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;
@@ -159,7 +197,7 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 param_incl = param_incl_all(i_model, :);
 
                 [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
-                    model_criterion, crossval_args, group);
+                    model_criterion, varargin, group);
 
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;

@@ -1,8 +1,9 @@
 # fitglm_exhaustive (Beta)
 Performs exhaustive (2^n_parameter) comparison of GLM models (or less)
 
-## Note
-Information criterion (AIC, BIC, ..) works; Cross validation mostly works but there seem to be issues in some cases.
+## Release Note (2016-07-13)
+Information criterion (AIC, BIC, ..) works.
+HoldOut works; Kfold may be implemented soon.
 
 ## Installation
 1. Download and extract the .zip file.
