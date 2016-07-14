@@ -7,8 +7,8 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %
 % INPUT
 % -----
-% X: a matrix of independent variables
-% y: a vector of the dependent variable
+% X: a matrix of independent variables, as given to glmfit or fitglm.
+% y: a vector of the dependent variable, as given to glmfit or fitglm.
 % glm_args: a cell array of the rest of the inputs for the fitglm.
 %           For example, {'Distribution', 'binomial'}.
 %
@@ -110,6 +110,7 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         ...
         'must_include', [] % Numerical indices of columns to include.
+        'crossval_args', {} % See crossval_glmfit
         'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
         'group', []
         ... group(k) 
@@ -172,6 +173,7 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
 
     mdls = cell(n_model, 1);
     model_criterion = S.model_criterion;
+    crossval_args = S.crossval_args;
     if isempty(S.group)
         group = ones(size(X, 1), 1);
 %         [~, ~, group] = unique(X, 'rows');
@@ -185,7 +187,7 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 param_incl = param_incl_all(i_model, :);
 
                 [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
-                    model_criterion, varargin, group);
+                    model_criterion, crossval_args, group);
 
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;
@@ -197,7 +199,7 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 param_incl = param_incl_all(i_model, :);
 
                 [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
-                    model_criterion, varargin, group);
+                    model_criterion, crossval_args, group);
 
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;
