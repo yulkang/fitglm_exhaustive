@@ -1,8 +1,16 @@
 function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 % Picks the best model among all 2^n_param possible models.
 %
-% [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
+% USAGE:
+% [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, ...)
 %
+% INPUT:
+% X: a matrix of independent variables
+% y: a vector of the dependent variable
+% glm_args: a cell array of the rest of the inputs for the fitglm.
+%           For example, {'Distribution', 'binomial'}.
+%
+% OUTPUT:
 % mdl: the best GeneralizedLinearModel among the models.
 % mdls: all models that are compared.
 % info: struct about the results of the comparison
@@ -21,6 +29,8 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 % .UseParallel
 % .group
 %
+% [...] = fitglm_exhaustive(..., 'OPTION1', OPTION1, ...)
+%
 % OPTIONS:
 % 'model_criterion', 'BIC' 
 % ... 'model_criterion'
@@ -28,8 +38,8 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 % ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
 % ...
 % 'must_include', [] % Numerical indices of columns to include.
-% 'crossval_args', {}
-% 'UseParallel', 'none' % 'model'|'none'
+% 'crossval_args', {} % See crossval_glmfit
+% 'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
 % 'group', [] 
 % ... group(k) 
 % ... : an integer between 1 and #group that k-th sample belongs to.
@@ -46,7 +56,7 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %     'model_criterion', 'BIC');
 % disp(mdl);
 %
-% See also: demo_fitglm_exhaustive, fitglm
+% See also: demo_fitglm_exhaustive, fitglm, crossval_glmfit
 
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
@@ -60,14 +70,14 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         ...
         'must_include', [] % Numerical indices of columns to include.
-        'crossval_args', {} % See 
-        'UseParallel', 'none' % 'model'|'none'
+        'crossval_args', {} % See crossval_glmfit
+        'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
         'group', []
         ... group(k) 
         ... : an integer between 1 and #group that k-th sample belongs to.
         ... : as from [~, ~, group] = unique(matrix).
         });
-
+    
     % Construct param_incl_all
     n_param = size(X, 2);
     n_model = 2 ^ n_param;
@@ -83,6 +93,18 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
     end
 
     param_incl_all = param_incl_all(model_incl, :);
+    n_model = size(param_incl_all, 1);
+
+    % Determine UseParallel
+    if strcmp(S.UseParallel, 'auto')
+        if (strcmp(S.model_criterion, 'crossval') & n_model >= 2) ...
+            || (n_model > 1e3)
+            
+            S.UseParallel = 'model';
+        else
+            S.UseParallel = 'none';
+        end
+    end
 
     % Fit
     [ic_all, ic_all0, param_incl_all, mdls] = ...
