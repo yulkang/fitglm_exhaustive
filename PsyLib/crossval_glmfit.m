@@ -1,5 +1,12 @@
 function [loglik, loglik0] = crossval_glmfit(X, y, glm_args, varargin)
 % [loglik, loglik0, cvix] = crossval_glmfit(X, y, glm_args, varargin)
+%
+% OPTION
+% ------
+% 'n_sim', 1e2
+% 'crossval_method', 'HoldOut'
+% 'crossval_args', {0.1}
+% 'group', []
 
 % 2016 (c) Yul Kang. hk2699 at columbia dot edu.
 
