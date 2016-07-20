@@ -1,123 +1,56 @@
 function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
-% FITGLM_EXHAUSTIVE  Picks the best model among all 2^n_param possible models.
+% Picks the best model among all 2^n_param possible models.
 %
-% USAGE
-% -----
-% [mdl, info, mdls] = FITGLM_EXHAUSTIVE(X, y, glm_args, ...)
+% [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 %
-% INPUT
-% -----
-% X: a matrix of independent variables, as given to glmfit or fitglm.
-% y: a vector of the dependent variable, as given to glmfit or fitglm.
-% glm_args: a cell array of the rest of the inputs for the fitglm.
-%           For example, {'Distribution', 'binomial'}.
+% OPTIONS:
+% 'model_criterion', 'BIC'
+% 'must_include', [] % Numerical indices of columns to include.
+% 'crossval_args', {}
+% 'UseParallel', 'model' % 'model'|'none'
 %
-% OUTPUT
-% ------
-% mdl: the best GeneralizedLinearModel among the models.
-% mdls: all models that are compared.
-% info: struct about the results of the comparison
-%     .param_incl : logical index of parameters chosen
-%     .ic_min : minimum information criterion
-%     .ic_min_ix : index of the model, starting from the null model.
-%     .ic_all(k) : k-th model's IC.
-%     .param_incl_all(k,m) : true if m-th parameter is included in k-th model.
-%     .ic_all0{k}(s) : for model_criterion=crossval, 
-%                      IC from s-th simulation of k-th model.
-%     .ic_all_se(k) : standard error of mean of k-th model's ICs.
+% WARNING:
+% Returning mdls (all models) can be memory intensive. 
+% When size(X) is about 1500 x 17 and 2^17 models are fitted,
+% mdls can take up >50GB.
+% Use it only when you have enough memory.
 %
-% info also contains the options:
-%     .model_criterion
-%     .must_include
-%     .UseParallel
-%     .group
+% NOTE 1:
+% Fitting all possible models can be impractical when size(X,2) > 25.
+% - Try reducing the dimensionality using PCA.
+% - If you have a priori reasons to believe some columns should always be
+%   included, use the 'must_include' option.
 %
-% Name-value pair arguments
-% -------------------------
-% [...] = fitglm_exhaustive(..., 'OPTION1', OPTION1, ...)
+% NOTE 2:
+% Estimate the time and memory expenditure first by using a small subset of
+% columns, like:
 %
-% 'model_criterion'
-%     'crossval' : cross validates using negative log likelihood
-%     'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
-%     Default: 'BIC'
+%     tic;
+%     [mdl, info, mdls] = fitglm_exhaustive(X(:,1:8), ...)
+%     toc;
 %
-% 'must_include'
-%     Numerical indices of columns to include.
-%     Default: []
+%     whos mdls
 %
-% 'crossval_args'
-%     See crossval_glmfit
+% Then estimate the time and memory needed by multiplying 
+% the elapsed time and mdls's size in the memory (Bytes) by 2^(size(X,2)-8).
 %
-% 'UseParallel'
-%     'auto'|'model'|'none'
-%     Default: 'auto'
-%
-% 'group'
-%     vector|empty
-%     vector: When model_criterion is 'crossval', enables stratified sampling.
-%             group(k) is the group number the k-th sample belongs to.
-%             It must be an integer between 1 and the number of groups.
-%     empty : All samples are in one group.
-%
-% EXAMPLE - BIC
-% -------------
-% n = 1e4;
-% X = rand(n,3) - 0.5;
-% y = X(:,1) * 0.4 + X(:,3) * 0.6 + 0.1;
-% y = max(min(y, 10), -10);
-% p = exp(y) ./ (1 + exp(y));
-% ch = rand(size(p)) < p;
-%
-% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'BIC')
-%
-% EXAMPLE - BIC, always including the second column
-% -------------------------------------------------
-% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'BIC', 'must_include', 2)
-%
-% EXAMPLE - cross-validation with default settings
-% ------------------------------------------------
-% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'crossval')
-%
-% EXAMPLE - cross-validation with 200 simulations of 50% holdout
-% --------------------------------------------------------------
-% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'crossval', ...
-%     'crossval_method', 'HoldOut', ...
-%     'crossval_args', {0.5}, ...
-%     'n_sim', 200)
-%
-% EXAMPLE - 5-fold cross-validation
-% --------------------------------------------------------------
-% [mdl, info, mdls] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
-%     'model_criterion', 'crossval', ...
-%     'crossval_method', 'Kfold', ...
-%     'crossval_args', {5})
-%
-% See also: demo_fitglm_exhaustive, fitglm, crossval_glmfit
-
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
     if ~exist('glm_args', 'var')
         glm_args = {};
     end
     S = varargin2S(varargin, {
+        ... % 'model_criterion'
+        ... % : 'crossval' : cross validates using negative log likelihood
+        ... % : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         'model_criterion', 'BIC' 
-        ... 'model_criterion'
-        ... : 'crossval' : cross validates using negative log likelihood
-        ... : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
-        ...
         'must_include', [] % Numerical indices of columns to include.
-        'crossval_args', {} % See crossval_glmfit
-        'UseParallel', 'auto' % 'auto'|'model'|'none' % 'auto': 
+        'crossval_args', {}
+        'UseParallel', 'model' % 'model'|'none'
         'group', []
-        ... group(k) 
-        ... : an integer between 1 and #group that k-th sample belongs to.
-        ... : as from [~, ~, group] = unique(matrix).
+        'return_mdls', (nargout >= 3)
         });
-    
+
     % Construct param_incl_all
     n_param = size(X, 2);
     n_model = 2 ^ n_param;
@@ -133,18 +66,6 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
     end
 
     param_incl_all = param_incl_all(model_incl, :);
-    n_model = size(param_incl_all, 1);
-
-    % Determine UseParallel
-    if strcmp(S.UseParallel, 'auto')
-        if (strcmp(S.model_criterion, 'crossval') & n_model >= 2) ...
-            || (n_model > 1e3)
-            
-            S.UseParallel = 'model';
-        else
-            S.UseParallel = 'none';
-        end
-    end
 
     % Fit
     [ic_all, ic_all0, param_incl_all, mdls] = ...
@@ -172,11 +93,12 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
     ic_all0 = cell(n_model, 1);
 
     mdls = cell(n_model, 1);
+    return_mdls = S.return_mdls;
+    
     model_criterion = S.model_criterion;
     crossval_args = S.crossval_args;
     if isempty(S.group)
-        group = ones(size(X, 1), 1);
-%         [~, ~, group] = unique(X, 'rows');
+        [~, ~, group] = unique(X, 'rows');
     else
         group = S.group;
     end
@@ -192,7 +114,9 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;
 
-                mdls{i_model} = c_mdl;
+                if return_mdls
+                    mdls{i_model} = c_mdl;
+                end
             end
         otherwise
             for i_model = 1:n_model
@@ -204,7 +128,9 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
                 ic_all(i_model) = c_ic;
                 ic_all0{i_model} = c_ic0;
 
-                mdls{i_model} = c_mdl;
+                if return_mdls
+                    mdls{i_model} = c_mdl;
+                end
             end
     end
 end
