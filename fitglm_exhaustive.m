@@ -75,7 +75,13 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
     ic_all_se = cellfun(@sem, ic_all0);
 
     [ic_min, ic_min_ix] = min(ic_all);
-    mdl = mdls{ic_min_ix};
+    
+    if S.return_mdls
+        mdl = mdls{ic_min_ix};
+    else % Estimate it again
+        [~,~,mdl] = fitglm_unit(X, y, glm_args, param_incl_all(ic_min_ix,:), ...
+            'none', {}, []);
+    end
 
     param_incl = param_incl_all(ic_min_ix, :);
 
@@ -159,6 +165,10 @@ function [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
                 c_ic = -c_ic;
                 c_ic0 = -c_ic0;
             end
+            
+        case 'none'
+            c_ic = nan;
+            c_ic0 = nan;
 
         otherwise
             c_ic = c_mdl.ModelCriterion.(model_criterion);
