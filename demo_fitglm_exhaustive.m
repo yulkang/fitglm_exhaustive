@@ -1,5 +1,5 @@
 % Demo for fitglm_exhaustive().
-
+%
 % WARNING:
 % Returning mdls (all models) can be memory intensive. 
 % When size(X) is about 1500 x 17 and 2^17 models are fitted,
@@ -24,7 +24,7 @@
 %
 % Then estimate the time and memory needed by multiplying 
 % the elapsed time and mdls's size in the memory (Bytes) by 2^(size(X,2)-8).
-%
+
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
 %% Preparation
