@@ -25,7 +25,7 @@
 % Then estimate the time and memory needed by multiplying 
 % the elapsed time and mdls's size in the memory (Bytes) by 2^(size(X,2)-8).
 
-% 2015 (c) Yul Kang. hk2699 at columbia dot edu.
+% 2015-2016 (c) Yul Kang. hk2699 at columbia dot edu.
 
 %%
 addpath(genpath('lib'));
@@ -47,6 +47,17 @@ tic;
 [mdl, info] = fitglm_exhaustive(X, ch, {'Distribution', 'binomial'}, ...
     'model_criterion', 'BIC')
 toc;
+
+%% BIC, Using Table
+% Use dataset2table() to convert datasets.
+column1 = X(:,1);
+column2 = X(:,2);
+column_unused = X(:,3);
+tbl = table(column1, column2, column_unused, y);
+
+[mdl, info] = fitglm_exhaustive(tbl, 'y', {'Distribution', 'binomial'}, ...
+    'model_criterion', 'BIC', ...
+    'UseParallel', 'none')
 
 %% Under construction
 
