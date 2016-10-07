@@ -92,7 +92,7 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
             y_name = var_names{end};
         else
             y_name = y;
-            y = table2array(X.(y_name));
+            y = X.(y_name);
         end
         X = table2array(X(:, setdiff(var_names, y_name, 'stable')));
         
