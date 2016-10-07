@@ -2,12 +2,31 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
 % Picks the best model among all 2^n_param possible models.
 %
 % [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
+% : X is a numeric matrix. y is a numeric vector.
+%   glm_args is a cell array of name-value pairs given to fitglm,
+%   e.g., {'Distribution', 'binomial', ...
+%          'CategoricalVars', {'column1', 'column2'}}
 %
-% OPTIONS:
-% 'model_criterion', 'BIC'
-% 'must_include', [] % Numerical indices of columns to include.
-% 'crossval_args', {}
-% 'UseParallel', 'model' % 'model'|'none'
+% [...] = fitglm_exhaustive(tbl, [], glm_args, varargin)
+% : tbl is a table. Use dataset2table to convert datasets.
+%   The last column is taken as the response variable.
+%
+% [...] = fitglm_exhaustive(tbl, ResposeVar, glm_args, varargin)
+% : tbl is a table. Use dataset2table to convert datasets.
+%   ResponseVar is the name of the column in tbl.
+%
+% Options
+% -------
+% ... % 'model_criterion'
+% ... % : 'crossval' : cross validates using negative log likelihood
+% ... % : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
+% 'model_criterion', 'BIC' 
+% 'must_include',    [] % Indices of columns of X to include.
+% 'must_exclude',    [] % Indices of columns of X to exclude.
+% 'crossval_args',   {}
+% 'UseParallel',     'model' % 'model'|'none'
+% 'verbose',         true
+% 'return_mdls',     (nargout >= 3)
 %
 % WARNING:
 % Returning mdls (all models) can be memory intensive. 
@@ -44,14 +63,51 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         ... % : 'crossval' : cross validates using negative log likelihood
         ... % : 'AIC', 'AICc', 'BIC', 'BICc', 'CAIC' : see mdl.ModelCriterion
         'model_criterion', 'BIC' 
-        'must_include', [] % Numerical indices of columns to include.
-        'crossval_args', {}
-        'UseParallel', 'model' % 'model'|'none'
-        'group', []
-        'return_mdls', (nargout >= 3)
+        'must_include',    [] % Indices of columns of X to include.
+        'must_exclude',    [] % Indices of columns of X to exclude.
+        'crossval_args',   {}
+        ...
+        ... % 'group'
+        ... % : Used in cross-validation.
+        ... %   Leave empty to treat each unique row as its own group.
+        'group',           [] 
+        'UseParallel',     'model' % 'model'|'none'
+        'verbose',         true
+        'return_mdls',     (nargout >= 3)
         });
+    
+    if islogical(S.must_include)
+        S.must_include = find(S.must_include);
+    end
+    if islogical(S.must_exclude)
+        S.must_exclude = find(S.must_exclude);
+    end
 
     % Construct param_incl_all
+    if istable(X)
+        assert(ischar(y) || isempty(y));
+        var_names = X.Properties.VariableNames;
+        if isempty(y)
+            y = table2array(X(:,end));
+            y_name = var_names{end};
+        else
+            y_name = y;
+            y = table2array(X.(y_name));
+        end
+        X = table2array(X(:, setdiff(var_names, y_name, 'stable')));
+        
+        glm_args = varargin2C({
+            'VarNames', var_names
+            'ResponseVar', y_name
+            }, glm_args);
+    else
+        assert(isnumeric(X));
+        assert(ismatrix(X));
+        
+        assert(isnumeric(y) || islogical(y));
+        assert(isvector(y));
+    end
+    
     n_param = size(X, 2);
     n_model = 2 ^ n_param;
     param_incl_all = false(n_model, n_param);
@@ -62,15 +118,30 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
         if ~isempty(S.must_include) && any(~param_incl(S.must_include))
             model_incl(i_model) = false;
         end
+        if ~isempty(S.must_exclude) && any(param_incl(S.must_exclude))
+            model_incl(i_model) = false;
+        end
         param_incl_all(i_model, :) = param_incl;
     end
 
     param_incl_all = param_incl_all(model_incl, :);
+    
+    if S.verbose
+        t_st = tic;
+        fprintf('Choosing among %d models began at %s\n', ...
+            nnz(model_incl), datestr(now, 30));
+    end
 
     % Fit
     [ic_all, ic_all0, param_incl_all, mdls] = ...
         fitglm_all(X, y, glm_args, param_incl_all, S);
 
+    if S.verbose
+        t_el = toc(t_st);
+        fprintf('Chose the best among %d models in %1.1f sec at %s\n', ...
+            nnz(model_incl), t_el, datestr(now, 30));
+    end
+    
     % Output
     ic_all_se = cellfun(@sem, ic_all0);
 
@@ -79,7 +150,8 @@ function [mdl, info, mdls] = fitglm_exhaustive(X, y, glm_args, varargin)
     if S.return_mdls
         mdl = mdls{ic_min_ix};
     else % Estimate it again
-        [~,~,mdl] = fitglm_unit(X, y, glm_args, param_incl_all(ic_min_ix,:), ...
+        [~,~,mdl] = fitglm_unit( ...
+            X, y, glm_args, param_incl_all(ic_min_ix,:), ...
             'none', {}, []);
     end
 
@@ -114,7 +186,8 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
             parfor i_model = 1:n_model
                 param_incl = param_incl_all(i_model, :);
 
-                [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
+                [c_ic, c_ic0, c_mdl] = fitglm_unit( ...
+                    X, y, glm_args, param_incl, ...
                     model_criterion, crossval_args, group);
 
                 ic_all(i_model) = c_ic;
@@ -128,7 +201,8 @@ function [ic_all, ic_all0, param_incl_all, mdls] = ...
             for i_model = 1:n_model
                 param_incl = param_incl_all(i_model, :);
 
-                [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
+                [c_ic, c_ic0, c_mdl] = fitglm_unit( ...
+                    X, y, glm_args, param_incl, ...
                     model_criterion, crossval_args, group);
 
                 ic_all(i_model) = c_ic;
@@ -149,16 +223,18 @@ function [c_ic, c_ic0, c_mdl] = fitglm_unit(X, y, glm_args, param_incl, ...
     switch model_criterion
         case 'crossval'
             if verLessThan('matlab', '8.6')
-                glm_args1 = [glm_args(:)', {'PredictorVars', find(param_incl)}];
-                [c_ic, c_ic0] = crossval_glmfit(X, y, glm_args1, ...
+                glm_args1 = [glm_args(:)', ...
+                    {'PredictorVars', find(param_incl)}];
+                [c_ic, c_ic0] = bml.stat.crossval_glmfit(X, y, glm_args1, ...
                     'group', group, crossval_args{:});
 
                 % Take negative log likelihood
                 c_ic = -c_ic;
                 c_ic0 = -c_ic0;
             else
-                glm_args1 = [glm_args(:)', {'PredictorVars',find(param_incl)}];
-                [c_ic, c_ic0] = crossval_glmfit(X, y, glm_args1, ...
+                glm_args1 = [glm_args(:)', ...
+                    {'PredictorVars',find(param_incl)}];
+                [c_ic, c_ic0] = bml.stat.crossval_glmfit(X, y, glm_args1, ...
                     'group', group, crossval_args{:});
 
                 % Take negative log likelihood
