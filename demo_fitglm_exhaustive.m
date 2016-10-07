@@ -27,6 +27,9 @@
 
 % 2015 (c) Yul Kang. hk2699 at columbia dot edu.
 
+%%
+addpath(genpath('lib'));
+
 %% Preparation
 n = 1e4;
 X = rand(n,3) - 0.5;
